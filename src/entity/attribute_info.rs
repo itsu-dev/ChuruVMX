@@ -140,7 +140,9 @@ pub struct PermittedSubclassesAttribute {
     pub classes: Vec<u16>,
 }
 
+// TODO: use unused attributes.
 #[derive(Debug, Clone)]
+#[allow(dead_code)]  // TODO remove
 pub enum AttributeKind {
     ConstantValue(ConstantValueAttribute),
     Code(CodeAttribute),
@@ -154,7 +156,7 @@ pub enum AttributeKind {
 pub fn load_attributes(count: u16, buffer: &mut &[u8], constant_pool: &Vec<ConstantKind>) -> Vec<AttributeKind> {
     let mut attributes: Vec<AttributeKind> = Vec::new();
 
-    for i in 0..count {
+    for _ in 0..count {
         let attribute_name_index = buffer.read_u16::<BigEndian>().unwrap();
         let attribute_length = buffer.read_u32::<BigEndian>().unwrap();
         let name = match &constant_pool[attribute_name_index as usize] {
@@ -164,9 +166,9 @@ pub fn load_attributes(count: u16, buffer: &mut &[u8], constant_pool: &Vec<Const
 
         match &name[..] {
             "Code" => {
-                let mut code_length = 0;
-                let mut exception_table_length = 0;
-                let mut attributes_count = 0;
+                let code_length;
+                let exception_table_length;
+                let attributes_count;
 
                 attributes.push(AttributeKind::Code(CodeAttribute {
                     base: AttributeInfoBase{

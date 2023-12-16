@@ -16,7 +16,7 @@ pub fn load_methods(count: u16, buffer: &mut &[u8], constant_pool: &Vec<Constant
     let mut methods = Vec::new();
 
     for _ in 0..count {
-        let mut attributes_count = 0;
+        let attributes_count;
         methods.push(MethodInfo {
             access_flags: buffer.read_u16::<BigEndian>().unwrap(),
             name_index: buffer.read_u16::<BigEndian>().unwrap(),

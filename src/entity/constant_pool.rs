@@ -140,7 +140,7 @@ pub fn load_constant_pool(count: u16, buffer: &mut &[u8]) -> Vec<ConstantKind> {
          tag: 0,
     }));
 
-    for i in 0..count - 1 {
+    for _ in 0..count - 1 {
         let tag = buffer.read_u8().unwrap();
 
         match tag {

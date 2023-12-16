@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use crate::entity::java_class_file::*;
 use crate::entity::constant_pool::load_constant_pool;
 use crate::entity::field_info::load_fields;
@@ -5,7 +7,24 @@ use crate::entity::attribute_info::load_attributes;
 use crate::entity::method_info::load_methods;
 use byteorder::{BigEndian, ReadBytesExt};
 
-pub fn define_class(bytes: &[u8]) -> JavaClassFileFormat {
+// TODO need to rename: remove the prefix `_`
+pub fn _find_class(name: &str, _class_path: &Vec<String>, class_files: &mut HashMap<String, JavaClassFileFormat>) -> JavaClassFileFormat {
+    if let Some(existing_class) = class_files.get(name) {
+        return existing_class.clone();
+    }
+
+    // TODO find class from class_path
+    define_class(&(name.to_owned() + ".class"), &[][..], class_files)
+}
+
+pub fn define_class(path: &str, bytes: &[u8], class_files: &mut HashMap<String, JavaClassFileFormat>) -> JavaClassFileFormat {
+    let defined_class = _define_class(bytes);
+    class_files.entry(path.to_string().split("/").last().unwrap().replace(".class", ""))
+        .or_insert(defined_class)
+        .to_owned()
+}
+
+fn _define_class(bytes: &[u8]) -> JavaClassFileFormat {
     let mut buffer = &bytes[..];
 
     let magic = buffer.read_u32::<BigEndian>().unwrap();
@@ -33,7 +52,7 @@ pub fn define_class(bytes: &[u8]) -> JavaClassFileFormat {
     let attributes_count = buffer.read_u16::<BigEndian>().unwrap();
     let attributes = load_attributes(attributes_count, &mut buffer, &constant_pool);
 
-    let class_file = JavaClassFileFormat {
+    JavaClassFileFormat {
         minor_version,
         major_version,
         constant_pool_count,
@@ -49,10 +68,7 @@ pub fn define_class(bytes: &[u8]) -> JavaClassFileFormat {
         methods,
         attributes_count,
         attributes,
-    };
-    // dbg!(&class_file);
-
-    class_file
+    }
 }
 
 fn load_interfaces(count: u16, buffer: &mut &[u8]) -> Vec<u16> {

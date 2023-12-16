@@ -1,3 +1,6 @@
+use byteorder::{BigEndian, ReadBytesExt};
+use std::string::String;
+
 #[derive(Debug, Clone)]
 pub struct ConstantInfoBase {
     pub tag: u8,
@@ -127,4 +130,154 @@ pub enum ConstantKind {
     InvokeDynamic(ConstantInvokeDynamicInfo),
     Module(ConstantModuleInfo),
     Package(ConstantPackageInfo),
+}
+
+pub fn load_constant_pool(count: u16, buffer: &mut &[u8]) -> Vec<ConstantKind> {
+    let mut constant_pool = Vec::new();
+
+    // This constant is for accessing constant pool by index.
+    constant_pool.push(ConstantKind::Empty(ConstantInfoBase {
+         tag: 0,
+    }));
+
+    for i in 0..count - 1 {
+        let tag = buffer.read_u8().unwrap();
+
+        match tag {
+            1 => {
+                let mut bytes: Vec<u8> = Vec::new();
+                let length = buffer.read_u16::<BigEndian>().unwrap();
+                for _ in 0..length {
+                    bytes.push(buffer.read_u8().unwrap());
+                }
+
+                constant_pool.push(ConstantKind::Utf8(ConstantUtf8Info {
+                    base: ConstantInfoBase { tag },
+                    length,
+                    text: String::from_utf8(bytes).unwrap(),
+                }));
+            }
+
+            3 => {
+                constant_pool.push(ConstantKind::Integer(ConstantIntegerInfo {
+                    base: ConstantInfoBase { tag },
+                    bytes: buffer.read_u32::<BigEndian>().unwrap(),
+                }));
+            }
+
+            4 => {
+                constant_pool.push(ConstantKind::Float(ConstantFloatInfo {
+                    base: ConstantInfoBase { tag },
+                    bytes: buffer.read_u32::<BigEndian>().unwrap(),
+                }));
+            }
+
+
+            5 => {
+                constant_pool.push(ConstantKind::Long(ConstantLongInfo {
+                    base: ConstantInfoBase { tag },
+                    high_bytes: buffer.read_u32::<BigEndian>().unwrap(),
+                    low_bytes: buffer.read_u32::<BigEndian>().unwrap(),
+                }));
+            }
+
+            6 => {
+                constant_pool.push(ConstantKind::Double(ConstantDoubleInfo {
+                    base: ConstantInfoBase { tag },
+                    high_bytes: buffer.read_u32::<BigEndian>().unwrap(),
+                    low_bytes: buffer.read_u32::<BigEndian>().unwrap(),
+                }));
+            }
+
+            7 => {
+                constant_pool.push(ConstantKind::Class(ConstantClassInfo {
+                    base: ConstantInfoBase { tag },
+                    name_index: buffer.read_u16::<BigEndian>().unwrap(),
+                }));
+            }
+
+            8 => {
+                constant_pool.push(ConstantKind::String(ConstantStringInfo {
+                    base: ConstantInfoBase { tag },
+                    string_index: buffer.read_u16::<BigEndian>().unwrap(),
+                }));
+            }
+
+            9 => {
+                constant_pool.push(ConstantKind::Fieldref(ConstantFieldrefInfo {
+                    base: ConstantInfoBase { tag },
+                    class_index: buffer.read_u16::<BigEndian>().unwrap(),
+                    name_and_type_index: buffer.read_u16::<BigEndian>().unwrap(),
+                }));
+            }
+
+            10 => {
+                constant_pool.push(ConstantKind::Methodref(ConstantMethodrefInfo {
+                    base: ConstantInfoBase { tag },
+                    class_index: buffer.read_u16::<BigEndian>().unwrap(),
+                    name_and_type_index: buffer.read_u16::<BigEndian>().unwrap(),
+                }));
+            }
+
+            11 => {
+                constant_pool.push(ConstantKind::InterfaceMethodref(ConstantInterfaceMethodrefInfo {
+                    base: ConstantInfoBase { tag },
+                    class_index: buffer.read_u16::<BigEndian>().unwrap(),
+                    name_and_type_index: buffer.read_u16::<BigEndian>().unwrap(),
+                }));
+            }
+
+            12 => {
+                constant_pool.push(ConstantKind::NameAndType(ConstantNameAndTypeInfo {
+                    base: ConstantInfoBase { tag },
+                    name_index: buffer.read_u16::<BigEndian>().unwrap(),
+                    descriptor_index: buffer.read_u16::<BigEndian>().unwrap(),
+                }));
+            }
+
+            15 => {
+                constant_pool.push(ConstantKind::MethodHandle(ConstantMethodHandleInfo {
+                    base: ConstantInfoBase { tag },
+                    reference_kind: buffer.read_u8().unwrap(),
+                    reference_index: buffer.read_u16::<BigEndian>().unwrap(),
+                }));
+            }
+
+            16 => {
+                constant_pool.push(ConstantKind::MethodType(ConstantMethodTypeInfo {
+                    base: ConstantInfoBase { tag },
+                    descriptor_index: buffer.read_u16::<BigEndian>().unwrap(),
+                }));
+            }
+
+            18 => {
+                constant_pool.push(ConstantKind::InvokeDynamic(ConstantInvokeDynamicInfo {
+                    base: ConstantInfoBase { tag },
+                    bootstrap_method_attr_index: buffer.read_u16::<BigEndian>().unwrap(),
+                    name_and_type_index: buffer.read_u16::<BigEndian>().unwrap(),
+                }));
+            }
+
+            19 => {
+                constant_pool.push(ConstantKind::Module(ConstantModuleInfo {
+                    base: ConstantInfoBase { tag },
+                    name_index: buffer.read_u16::<BigEndian>().unwrap(),
+                }));
+            }
+
+            20 => {
+                constant_pool.push(ConstantKind::Package(ConstantPackageInfo {
+                    base: ConstantInfoBase { tag },
+                    name_index: buffer.read_u16::<BigEndian>().unwrap(),
+                }));
+            }
+
+            _ => {
+                panic!("Invalid constant pool tag.");
+            }
+        }
+
+    }
+
+    constant_pool
 }

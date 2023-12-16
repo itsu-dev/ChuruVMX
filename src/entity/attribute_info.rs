@@ -1,3 +1,6 @@
+use crate::entity::constant_pool::*;
+use byteorder::{BigEndian, ReadBytesExt};
+
 #[derive(Debug, Clone)]
 pub struct AttributeInfoBase {
     pub attribute_name_index: u16,
@@ -146,4 +149,74 @@ pub enum AttributeKind {
     NestHost(NestHostAttribute),
     NestMembers(NestMembersAttribute),
     PermittedSubclasses(PermittedSubclassesAttribute),
+}
+
+pub fn load_attributes(count: u16, buffer: &mut &[u8], constant_pool: &Vec<ConstantKind>) -> Vec<AttributeKind> {
+    let mut attributes: Vec<AttributeKind> = Vec::new();
+
+    for i in 0..count {
+        let attribute_name_index = buffer.read_u16::<BigEndian>().unwrap();
+        let attribute_length = buffer.read_u32::<BigEndian>().unwrap();
+        let name = match &constant_pool[attribute_name_index as usize] {
+            ConstantKind::Utf8(utf8_info) => utf8_info.text.clone(),
+            _ => panic!("Invalid constant pool entry: {:?}", attribute_name_index),
+        };
+
+        match &name[..] {
+            "Code" => {
+                let mut code_length = 0;
+                let mut exception_table_length = 0;
+                let mut attributes_count = 0;
+
+                attributes.push(AttributeKind::Code(CodeAttribute {
+                    base: AttributeInfoBase{
+                        attribute_name_index, attribute_length,
+                    },
+                    max_stack: buffer.read_u16::<BigEndian>().unwrap(),
+                    max_locals: buffer.read_u16::<BigEndian>().unwrap(),
+                    code_length: {
+                        code_length = buffer.read_u32::<BigEndian>().unwrap();
+                        code_length
+                    },
+                    code: {
+                        let mut code = Vec::new();
+                        for _ in 0..code_length {
+                            code.push(buffer.read_u8().unwrap());
+                        }
+                        code
+                    },
+                    exception_table_length: {
+                        exception_table_length = buffer.read_u16::<BigEndian>().unwrap();
+                        exception_table_length
+                    },
+                    exception_table: {
+                        let mut exception_table = Vec::new();
+                        for _ in 0..exception_table_length {
+                            exception_table.push(ExceptionTableEntry {
+                                start_pc: buffer.read_u16::<BigEndian>().unwrap(),
+                                end_pc: buffer.read_u16::<BigEndian>().unwrap(),
+                                handler_pc: buffer.read_u16::<BigEndian>().unwrap(),
+                                catch_type: buffer.read_u16::<BigEndian>().unwrap(),
+                            });
+                        }
+                        exception_table
+                    },
+                    attributes_count: {
+                        attributes_count = buffer.read_u16::<BigEndian>().unwrap();
+                        attributes_count
+                    },
+                    attributes: load_attributes(attributes_count, buffer, constant_pool),
+                }));
+            }
+
+            // Unimplemented attributes
+            _ => {
+                for _ in 0..attribute_length {
+                    let _ = buffer.read_u8();
+                }
+            }
+        }
+    }
+
+    attributes
 }
